@@ -73,7 +73,7 @@ def main():
     args = parser.parse_args()
     enc = encoder.get_encoder(args.model_name)
     hparams = model.default_hparams()
-    with open(os.path.join('models', args.model_name, 'hparams.json')) as f:
+    with open(os.path.join('src/models', args.model_name, 'hparams.json')) as f:
         hparams.override_from_dict(json.load(f))
 
     if args.sample_length > hparams.n_ctx:
@@ -161,10 +161,10 @@ def main():
             if ckpt is None:
                 # Get fresh GPT weights if new run.
                 ckpt = tf.train.latest_checkpoint(
-                    os.path.join('models', args.model_name))
+                    os.path.join('src/models', args.model_name))
         elif args.restore_from == 'fresh':
             ckpt = tf.train.latest_checkpoint(
-                os.path.join('models', args.model_name))
+                os.path.join('src/models', args.model_name))
         else:
             ckpt = tf.train.latest_checkpoint(args.restore_from)
         print('Loading checkpoint', ckpt)
