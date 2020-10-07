@@ -5,14 +5,22 @@ from simulink_preprocess import remove_graphic_component,keep_minimum_component_
 import os
 class Restructure_mdl():
     '''
-    This class provides utilities to restructure the Mdl Files
-    '''
+        This class provides utilities to restructure the Mdl Files
+        '''
+
     def __init__(self,simulink_model_name,output_dir='output'):
+        '''Instantiate a Restructure_mdl class variables .
+
+                args:
+                    simulink_model_name: Name of Simulink model . eg. xyz.mdl
+                    output_dir: directory where the bfs restructured simulink model will be saved. This is used for training data
+        '''
+
         self._file = simulink_model_name
         self._output_dir = output_dir
         self._structure_to_extract = { 'System','Block','Line'} # Hierarchy level in mdl elements.
-        self._tmp_ext = '_TMP'
-        self._bfs_ext = '_bfs'
+        self._tmp_ext = '_TMP'# intermediate file that filters mdl file to only have System block { ... } . Output will be xyz_tmp.mdl
+        self._bfs_ext = '_bfs' # output file saved in output directory... file name is xyz_bfs.mdl
         self._tmp_dir = 'tmp'
         self._valid_chk_dir = "V_CHK"
         self.model_info = model_info()
@@ -24,6 +32,12 @@ class Restructure_mdl():
             os.mkdir(self._valid_chk_dir)
 
     def update_brace_count(self, tokens):
+        '''
+                keep track of brace count
+
+                args:
+                    tokens: token in a line of the file
+        '''
         assert(self._brace_count >= 0)
 
         if '{' in tokens:
@@ -32,6 +46,15 @@ class Restructure_mdl():
             self._brace_count -= 1
 
     def extract_system_blk(self):
+        '''
+        extracts system block of the Simulink mdl file. Filter out everything else.
+        The structure left in the output is Model { Name toy System { Name toy Block { .....} ... }}
+
+        It also changes the name of the Simulink model to toy
+        And It also updates the model_info object which keeps track of blocks and its connections. Necessary for bfs restructuring.
+        returns:
+            filtered list of line in the original file. Each element of the list corresponds to the line in the original file.
+        '''
         self._brace_count = 0
         _processed_output = []
         stack = []
@@ -101,6 +124,10 @@ class Restructure_mdl():
 
 
     def restructure_single_mdl(self):
+        '''
+        Entry point for restructuring. Calls functions in a sequence.
+        Each functions returned value is the input parameter to next function in the sequence.
+        '''
         tmp_output = self.extract_system_blk()
         #print(tmp_output)
         tmp_filename = self._file.split('/')[-1] .split('.')[0]+ self._tmp_ext + '.mdl'
@@ -129,6 +156,13 @@ class Restructure_mdl():
         #print(output)
 
     def save_to_file(self,  path, tmp_output,org_norm_name_dict = None):
+        '''
+        saves/write the list of line to a file.
+        args:
+            path : full path location of the file to which tmp_output is to be saved
+            tmp_output: list of lines . Each element of the list corresponds to the line in the original file.
+            org_norm_name_dict: dictionary with key : block name and value : normalized block name. Example clblk1 : a, clblk2: b and so on
+        '''
         tmp = '\n'.join(tmp_output)
         if org_norm_name_dict is not None:
             for k,v in org_norm_name_dict.items():
@@ -138,6 +172,17 @@ class Restructure_mdl():
             r.write(tmp)
 
     def bfs_ordering_validation(self,path):
+        '''
+        converts the BFS ordered Simulink file back to Simulink acceptable format: where Block {} defination comes first and then Line {} defination
+        Caveat: Block with Block Type Outport have to be defined end of the all other block defination arranged in ascending order based on its port number
+        while BLock Type Inport has to be defined beginning of the Block defination .
+
+        args:
+            path: full path of the Simulink model file.
+
+        returns :
+            list of lines where each element corresponds to the line in the processed file.
+        '''
         self._brace_count = 0
         stack = []
         stack_pop_brace_count = 0
@@ -278,8 +323,8 @@ class Restructure_mdl():
             output += ['}','}']
         return output,orig_normalized_blk_names
 
-    def bfs_ordering(self, source_block, model_info, path):
-        blk_info = [k for k in self.model_info.blk_info.keys()]
+    def bfs_ordering_new(self, source_block, model_info, path):
+        blk_names = [k for k in self.model_info.blk_info.keys()]
         orig_normalized_blk_names = {}
         name_counter = 1
         output = []
@@ -296,24 +341,24 @@ class Restructure_mdl():
                     blk_visited = queue.pop(0)
                     #print(blk_visited)
                     #print(blk_info)
-                    if blk_visited in blk_info:
+                    if blk_visited in blk_names:
                         if blk_visited not in orig_normalized_blk_names:
                             orig_normalized_blk_names[blk_visited] = get_normalize_block_name(name_counter)
                             name_counter += 1
                         block_info = self.model_info.blk_info[blk_visited]
                         output.append(block_info) # adding block info
-                        blk_info.remove(blk_visited)
+                        blk_names.remove(blk_visited)
                         if blk_visited in self.model_info.graph:
                             for dest_edge in self.model_info.graph[blk_visited]:
                                 (dest, edge) = dest_edge
                                 output.append(edge)
                                 for d in dest:
-                                    if d in blk_info:
+                                    if d in blk_names:
                                         queue.append(d)
                     if blk_visited in source_block:
                         source_block.remove(blk_visited)
             # Blocks not connected to any other blocks and is not source blocks
-            while len(blk_info) != 0:
+            while len(blk_names) != 0:
                 blk_visited = blk_info[0]
                 queue = []
                 queue.append(blk_visited)
@@ -321,18 +366,18 @@ class Restructure_mdl():
                     blk_visited = queue.pop(0)
                     # print(blk_visited)
                     # print(blk_info)
-                    if blk_visited in blk_info:
+                    if blk_visited in blk_names:
                         if blk_visited not in orig_normalized_blk_names:
                             orig_normalized_blk_names[blk_visited] = get_normalize_block_name(name_counter)
                             name_counter += 1
                         output.append(self.model_info.blk_info[blk_visited])  # adding block info
-                        blk_info.remove(blk_visited)
+                        blk_names.remove(blk_visited)
                         if blk_visited in self.model_info.graph:
                             for dest_edge in self.model_info.graph[blk_visited]:
                                 (dest, edge) = dest_edge
                                 output.append(edge)
                                 for d in dest:
-                                    if d in blk_info:
+                                    if d in blk_names:
                                         queue.append(d)
 
                     #output.append(self.model_info.blk_info[remaining_blk])

@@ -1,16 +1,27 @@
 import re
 from utils import get_tokens, blk_name_check
 class model_info():
+    '''
+        class to maintain the Simulink model info as a graph.
+    '''
     def __init__(self):
-        self.graph = {}
-        self.blk_info = {}
+        self.graph = {} # dictionary that maintains Simulink model as a graph in adjacency matrix where keys = source block name  and values = (dest block name, line code)
+        self.blk_info = {} # dictionary to maintain block code corresponding to block name. key = block name and value = block code.
 
     def get_src_dst(self):
+        '''
+         returns: Simulink source block and Simulink sink blocks
+        '''
         source_blk =  [blk_name for blk_name in self.graph.keys()]
         dst_blk = [dest for dest_code in self.graph.values() for dest_list,code in dest_code for dest in dest_list]
         return source_blk,dst_blk
 
     def get_write_ready_blk_conn_list(self):
+        '''
+         this function is used to structure a Simulink model file in bfs format to Simulink standard format
+         returns:
+            list of block code and line codes in Simulink standard format.
+        '''
         all_blks = [k for k in self.blk_info.keys()]
         all_blks_vist = all_blks.copy()
         blk_code_lst = []
@@ -66,6 +77,11 @@ class model_info():
         return blk_code_lst, line_code_lst
 
     def update_line_info(self,line_code): # edges
+        '''
+            updates the model_info obj attribute:  self.graph.
+            args:
+                line_code : line code from Simulink model file
+        '''
         src_blk = ''
         dest_blk = []
         lines = line_code.split("\n")
@@ -87,6 +103,12 @@ class model_info():
             self.graph[src_blk] = [(dest_blk,line_code)]
 
     def update_blk_info(self, blk_code):
+
+        '''
+            updates the model_info obj attribute:  self.blk_info.
+            args:
+                blk_code : blk code from Simulink model file
+        '''
         lines  =   blk_code.split("\n")
         for idx in range(len(lines)):
             tokens = get_tokens(lines[idx])

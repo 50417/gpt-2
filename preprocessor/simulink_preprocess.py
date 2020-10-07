@@ -1,6 +1,13 @@
 from typing import List
 from utils import get_tokens
 def remove_graphic_component(text: str) -> List:
+    '''
+        removes components that are not necessary for the compilation of Simulink model. The component are auto generated when saved in Simulink.
+        args:
+            text: Simulink model file.
+        returns :
+            list of lines where line containing remove_list are filtered
+    '''
     lines = []
     remove_list = ["Position","ZOrder","SID","Points"]
     for line in text.split("\n"):
