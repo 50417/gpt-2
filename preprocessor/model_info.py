@@ -5,8 +5,11 @@ class model_info():
         class to maintain the Simulink model info as a graph.
     '''
     def __init__(self):
+        ''' destination block name is a list to account for the lines with branch
+        Assumption . A line with branch will only have single source/. Thats why source source block is string'''
         self.graph = {} # dictionary that maintains Simulink model as a graph in adjacency matrix where keys = source block name  and values = (dest block name, line code)
         self.blk_info = {} # dictionary to maintain block code corresponding to block name. key = block name and value = block code.
+        self.graph_dest = {} # dictionary to maintain Simulink model as a graph in adjaceny matrix where key = destination block name and values = (Source Block name, otherdestination, line code)
 
     def get_src_dst(self):
         '''
@@ -84,6 +87,7 @@ class model_info():
         '''
         src_blk = ''
         dest_blk = []
+
         lines = line_code.split("\n")
         for idx in range(len(lines)):
             tokens = get_tokens(lines[idx])
@@ -93,7 +97,7 @@ class model_info():
                 while  not blk_name_check(src_blk_name):
                     idx += 1
                     src_blk_name += lines[idx]
-                    print(src_blk_name)
+                    #print(src_blk_name)
                 src_blk = src_blk_name
             elif (tokens[0] == "DstBlock"):
                 dest_blk.append(tokens[1])
@@ -101,6 +105,11 @@ class model_info():
             self.graph[src_blk].append((dest_blk,line_code))
         else:
             self.graph[src_blk] = [(dest_blk,line_code)]
+        for b in dest_blk:
+            if b in self.graph_dest:
+                self.graph_dest[b].append((src_blk,line_code))
+            else:
+                self.graph_dest[b] = [(src_blk,line_code)]
 
     def update_blk_info(self, blk_code):
 

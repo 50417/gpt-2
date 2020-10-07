@@ -128,27 +128,26 @@ class Restructure_mdl():
         Entry point for restructuring. Calls functions in a sequence.
         Each functions returned value is the input parameter to next function in the sequence.
         '''
-        tmp_output = self.extract_system_blk()
-        #print(tmp_output)
+
         tmp_filename = self._file.split('/')[-1] .split('.')[0]+ self._tmp_ext + '.mdl'
         output_filename = self._file.split('/')[-1] .split('.')[0]+ self._bfs_ext + '.mdl'
+
         tmp_path  = os.path.join(self._tmp_dir,tmp_filename)
         output_path = os.path.join(self._output_dir,output_filename)
         valid_chk_path  = os.path.join(self._valid_chk_dir,output_filename)
-        self.save_to_file(tmp_path,  tmp_output)
-        src, dest = self.model_info.get_src_dst()
 
+        tmp_output = self.extract_system_blk()
+        self.save_to_file(tmp_path,  tmp_output)
+
+        src, dest = self.model_info.get_src_dst()
         source_block = list(set(src).difference(set(dest)))
-        output,org_norm_name_dict = self.bfs_ordering(source_block, self.model_info, tmp_path)
-        print("\n".join(output))
+        output,org_norm_name_dict = self.bfs_ordering_new(source_block, self.model_info, tmp_path)
+        #print("\n".join(output))
 
         output = remove_graphic_component("\n".join(output))
-
         self.save_to_file(output_path,output,org_norm_name_dict)
 
-
-
-        bfs_valid_output = self.bfs_ordering_validation('/home/sls6964xx/Documents/GPT2/gpt-2/src/sample.mdl')
+        bfs_valid_output = self.bfs_ordering_validation(output_path)
         self.save_to_file(valid_chk_path, bfs_valid_output)
 
         #output = keep_minimum_component_in_block("\n".join(bfs_valid_output))
@@ -328,77 +327,62 @@ class Restructure_mdl():
         orig_normalized_blk_names = {}
         name_counter = 1
         output = []
+        unique_lines_added = set()
         with open(path,'r') as tmp_file:
             line = next(tmp_file)
             while "Block {" != line.strip():
                 output.append(line)
 
                 line = next(tmp_file)
-            while len(source_block) != 0:
+            while len(source_block) != 0 or len(blk_names)!=0:
                 queue = []
-                queue.append(source_block[-1])
+                if len(source_block) != 0:
+                    queue.append(source_block[-1])
+                elif len(blk_names)!=0:
+                    queue.append(blk_names[-1])
                 while len(queue) != 0 :
                     blk_visited = queue.pop(0)
-                    #print(blk_visited)
-                    #print(blk_info)
                     if blk_visited in blk_names:
                         if blk_visited not in orig_normalized_blk_names:
                             orig_normalized_blk_names[blk_visited] = get_normalize_block_name(name_counter)
                             name_counter += 1
-                        block_info = self.model_info.blk_info[blk_visited]
-                        output.append(block_info) # adding block info
+                        block_code = self.model_info.blk_info[blk_visited]
+                        output.append(block_code) # adding block code
                         blk_names.remove(blk_visited)
                         if blk_visited in self.model_info.graph:
                             for dest_edge in self.model_info.graph[blk_visited]:
                                 (dest, edge) = dest_edge
-                                output.append(edge)
+                                if edge not in unique_lines_added:
+                                    output.append(edge)
+                                unique_lines_added.add(edge)
                                 for d in dest:
                                     if d in blk_names:
                                         queue.append(d)
+                        if blk_visited in self.model_info.graph_dest:
+                            for src_edge in self.model_info.graph_dest[blk_visited]:
+                                (src, edge) = src_edge
+                                if edge not in unique_lines_added:
+                                    output.append(edge)
+                                unique_lines_added.add(edge)
+                                if src in blk_names:
+                                    queue.append(src)
+
                     if blk_visited in source_block:
                         source_block.remove(blk_visited)
-            # Blocks not connected to any other blocks and is not source blocks
-            while len(blk_names) != 0:
-                blk_visited = blk_info[0]
-                queue = []
-                queue.append(blk_visited)
-                while len(queue) != 0:
-                    blk_visited = queue.pop(0)
-                    # print(blk_visited)
-                    # print(blk_info)
-                    if blk_visited in blk_names:
-                        if blk_visited not in orig_normalized_blk_names:
-                            orig_normalized_blk_names[blk_visited] = get_normalize_block_name(name_counter)
-                            name_counter += 1
-                        output.append(self.model_info.blk_info[blk_visited])  # adding block info
-                        blk_names.remove(blk_visited)
-                        if blk_visited in self.model_info.graph:
-                            for dest_edge in self.model_info.graph[blk_visited]:
-                                (dest, edge) = dest_edge
-                                output.append(edge)
-                                for d in dest:
-                                    if d in blk_names:
-                                        queue.append(d)
-
-                    #output.append(self.model_info.blk_info[remaining_blk])
-
-                    #print(self.model_info.blk_info[blk_visited])
-
-
             output += ['}','}']
             return output,orig_normalized_blk_names
 
 
 
-# directory = '/home/sls6964xx/Desktop/RandomMOdelGeneratorInMDLFormat/slsf/reportsneo/2020-09-02-14-27-55/success/'
-# count = 1
-# for files in os.listdir(directory):
-#     count +=1
-#     print(count, " : ", files)
-#     processor = Restructure_mdl(os.path.join(directory,files))
-#     processor.restructure_single_mdl()
-#
-#     #print(os.path.join(directory,files))
+directory = '/home/sls6964xx/Desktop/RandomMOdelGeneratorInMDLFormat/slsf/reportsneo/2020-09-02-14-27-55/success/'
+count = 0
+for files in os.listdir(directory):
+    count +=1
+    print(count, " : ", files)
+    processor = Restructure_mdl(os.path.join(directory,files))
+    processor.restructure_single_mdl()
+
+    #print(os.path.join(directory,files))
 
 # x = """slforge_100840958_166_bfs
 # slforge_103070060_954_bfs
@@ -559,5 +543,8 @@ class Restructure_mdl():
 # for k in x.split('\n'):
 #     processor = Restructure_mdl('/home/sls6964xx/Documents/GPT2/gpt-2/preprocessor/output/'+k+'.mdl')#slforge_946325154_115_bfs.mdl')#('/home/sls6964xx/Desktop/RandomMOdelGeneratorInMDLFormat/slsf/reportsneo/2020-09-02-14-27-55/success/slforge_598683771_989.mdl')
 #     processor.restructure_single_mdl()
-processor = Restructure_mdl('/home/sls6964xx/Documents/GPT2/gpt-2/src/sample.mdl')#slforge_946325154_115_bfs.mdl')#('/home/sls6964xx/Desktop/RandomMOdelGeneratorInMDLFormat/slsf/reportsneo/2020-09-02-14-27-55/success/slforge_598683771_989.mdl')
-processor.restructure_single_mdl()
+# processor = Restructure_mdl('/home/sls6964xx/Documents/GPT2/gpt-2/src/sample.mdl')#slforge_946325154_115_bfs.mdl')#('/home/sls6964xx/Desktop/RandomMOdelGeneratorInMDLFormat/slsf/reportsneo/2020-09-02-14-27-55/success/slforge_598683771_989.mdl')
+# processor.restructure_single_mdl()
+
+# processor = Restructure_mdl('/home/sls6964xx/Desktop/RandomMOdelGeneratorInMDLFormat/slsf/reportsneo/2020-09-02-14-27-55/success/slforge_911701014_178.mdl')#slforge_946325154_115_bfs.mdl')#('/home/sls6964xx/Desktop/RandomMOdelGeneratorInMDLFormat/slsf/reportsneo/2020-09-02-14-27-55/success/slforge_598683771_989.mdl')
+# processor.restructure_single_mdl()
