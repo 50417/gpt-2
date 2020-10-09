@@ -11,7 +11,7 @@ import model, sample, encoder
 def interact_model(
     model_name='117M',
     seed=None,
-    nsamples=1,
+    nsamples=1000,
     batch_size=1,
     length=None,
     temperature=1,
@@ -52,7 +52,8 @@ def interact_model(
         print(length)
     #elif length > hparams.n_ctx:
     #   raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
-    config = tf.ConfigProto(device_count={'GPU': 0})
+    #config = tf.ConfigProto(device_count={'GPU': 0})
+    config = tf.ConfigProto()
     with tf.Session(graph=tf.Graph(),config=config) as sess:
         context = tf.placeholder(tf.int32, [batch_size, None])
         np.random.seed(seed)
@@ -70,37 +71,52 @@ def interact_model(
         saver = tf.train.Saver()
         ckpt = tf.train.latest_checkpoint(os.path.join('models', model_name))
         saver.restore(sess, ckpt)
-        file_to_save = open("sample.mdl",'w+')
-        file_to_save.write(raw_text)
-        while True:
+        from datetime import datetime
+        #while True:
+        generated = 0
+        import time
+        grand_start = time.time()
+        for cnt in range(nsamples // batch_size):
+            start_per_sample = time.time()
+            output_text = raw_text
+            text = raw_text
+            context_tokens = enc.encode(text)
             #raw_text = input("Model prompt >>> ")
-            while not raw_text:
-                print('Prompt should not be empty!')
-                raw_text = input("Model prompt >>> ")
-            context_tokens = enc.encode(raw_text)
+            # while not raw_text:
+            #     print('Prompt should not be empty!')
+            #     raw_text = input("Model prompt >>> ")
+
             #print(context_tokens)
             #file_to_save.write(raw_text)	
-            generated = 0
-            for _ in range(nsamples // batch_size):
+
+            #for cnt in range(nsamples // batch_size):
+            while "<|endoftext|>" not in text:
                 out = sess.run(output, feed_dict={context: [context_tokens for _ in range(batch_size)]})[:,
-                      len(context_tokens):]
+                  len(context_tokens):]
 
                 for i in range(batch_size):
-                    generated += 1
+                #generated += 1
                     text = enc.decode(out[i])
-                    if "<|endoftext|>" in text:
-                        break
-                    file_to_save.write(text)
-	             
-                    print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
-                    print(text)
-            raw_text = text
-            if "<|endoftext|>" in text:
-                sep = "<|endoftext|>"
-                rest = text.split(sep, 1)[0]
-                file_to_save.write(rest)
-                break
-            print("=" * 80)
 
+
+                if "<|endoftext|>" in text:
+                    sep = "<|endoftext|>"
+                    rest = text.split(sep, 1)[0]
+                    output_text += rest
+                    break
+                context_tokens = enc.encode(text)
+                output_text += text
+
+
+            print("=" * 40 + " SAMPLE " + str(cnt+12) + " " + "=" * 40)
+            minutes, seconds = divmod(time.time() - start_per_sample, 60)
+            print("Output Done : {:0>2}:{:05.2f}".format(int(minutes),seconds) )
+            print("=" * 80)
+            with open("Simulink_sample/sample__"+str(cnt+12)+".mdl","w+") as f:
+                f.write(output_text)
+        elapsed_total = time.time()-grand_start
+        hours, rem = divmod(elapsed_total,3600)
+        minutes, seconds = divmod(rem, 60)
+        print("Total time to generate 1000 samples :{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds))
 if __name__ == '__main__':
     fire.Fire(interact_model)
