@@ -19,6 +19,31 @@ class model_info():
         dst_blk = [dest for dest_code in self.graph.values() for dest_list,code in dest_code for dest in dest_list]
         return source_blk,dst_blk
 
+    def fix_outport(self,outport_blk_code_sorted):
+        return_list = []
+        for idx in range(len(outport_blk_code_sorted)):
+            if idx == 0:
+                return_list.append(outport_blk_code_sorted[idx])
+                continue
+            code = outport_blk_code_sorted[idx]
+            has_port_number = False
+            for line in code.split("\n"):
+                tok = get_tokens(line)
+                if "Port" in tok:
+                    has_port_number = True
+                    param, val = tok[0], tok[1]
+                    port_num = re.findall(r"[0-9]+", val)
+                    code.replace(port_num[0],str(idx+1))
+                    return_list.append(code)
+                    break
+            if not has_port_number:
+                c_idx = code.index("IconDisplay")
+                code = code[:c_idx] + "\nPort \"" + str(idx+1) + '"\n' + code[c_idx:]
+                return_list.append(code)
+        return return_list
+
+
+
     def get_write_ready_blk_conn_list(self):
         '''
          this function is used to structure a Simulink model file in bfs format to Simulink standard format
@@ -48,7 +73,6 @@ class model_info():
                         if len(port_num) ==0:
                             continue
                         port_num = int(port_num[0])
-
                         outport_blk_code.append(code)
                         port_number_order.append(port_num)
                 if first_outport:
@@ -62,7 +86,7 @@ class model_info():
         sorted_idx = [i[0] for i in sorted(enumerate(port_number_order),key= lambda x:x[1])]
         outport_blk_code_sorted = [ outport_blk_code[k] for k in sorted_idx]
 
-
+        outport_blk_code_sorted = self.fix_outport(outport_blk_code_sorted)
         for blk in all_blks:
             if blk in outport_blk_name:
                 continue
@@ -126,8 +150,8 @@ class model_info():
                 while not blk_name_check(blk_name):
                     idx += 1
                     blk_name += lines[idx]
-
-                self.blk_info[blk_name] = blk_code
+                if blk_name not in self.blk_info:
+                    self.blk_info[blk_name] = blk_code
         #print(self.blk_info)
 '''
 m = model_info()

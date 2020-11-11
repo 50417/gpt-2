@@ -13,6 +13,7 @@ def get_tokens(line):
 def remove_extra_white_spaces(line):
     '''
     removes extra white spaces in the text
+    and converts to lowercase.
     args:
         line: any text
         returns:
@@ -25,7 +26,7 @@ def remove_extra_white_spaces(line):
 
 
 
-def blk_name_check(name= '"Complexko\"'):
+def blk_name_check(name):#= '"Complexko\"'):
     '''
         varibles name or block name rules in Simulink are recommended but not enforced . So blk name can be multi-line with quotes in their name.
         This functions checks if block we have seen so far is complete block name. For example : "Complex\n number". So a Block name is not the name between quotes only.
